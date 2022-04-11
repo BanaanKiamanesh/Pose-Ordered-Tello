@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 from time import time, sleep
 import mediapipe as mp
-import matplotlib.pyplot as plt
 import os
 import datetime
 
