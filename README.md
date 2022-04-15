@@ -29,3 +29,5 @@ This is a simple implementation of Pose Estimataion Tree for sending command to 
 3. Based on the given angles each of the poses are getting detected
 4. Based on that the commands are bieng sent to the Quadcoter
 5. After Execution of each command, 50 frames of images are being ignored till the next command arises!
+
+***Note:*** Only tested on Ubuntu 20.04!
