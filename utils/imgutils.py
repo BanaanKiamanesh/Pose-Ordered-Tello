@@ -174,7 +174,7 @@ def classifyPose(angles, threshold=15):
             return 'Right'
 
         # Land Pose
-        elif isinrange(LE, 180, threshold) and isinrange(RE, 180, threshold) and isinrange(LS, 90, threshold) and isinrange(RS, 90, threshold):
+        elif isinrange(LE, 180, threshold) and isinrange(RE, 180, threshold) and isinrange(LS, 180, threshold) and isinrange(RS, 180, threshold):
             return 'Land'
 
         else:

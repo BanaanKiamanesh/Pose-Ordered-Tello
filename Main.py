@@ -5,9 +5,13 @@ from utils.imgutils import *
 from utils.droneutils import *
 
 # Params
-POSE_ANGLE_THRESHOLD = 25
+POSE_ANGLE_THRESHOLD = 20
 MOVE_CONSTANT_DIST = 70
-FRAMES_TO_IGNORE = 70
+FRAMES_TO_IGNORE = 50
+
+MIN_DIST = 60
+MAX_DIST = 280
+
 
 # Initialize the drone
 tello = drone_init()
@@ -24,6 +28,12 @@ image_width = 640
 image_height = 480
 
 frame_count = 0
+
+# Left Right Specs
+lrVel = 0
+fbVel = 0
+distSetpoint = 200
+
 
 print("Image width: " + str(image_width))
 print("Image height: " + str(image_height))
@@ -65,22 +75,30 @@ with mp.solutions.pose.Pose(
 
             elif pose_type == "Flip":
                 tello.flip_back()
-                frame_count = FRAMES_TO_IGNORE
+                frame_count = FRAMES_TO_IGNOREbb
 
             elif pose_type == "Right":
-                tello.move_left(MOVE_CONSTANT_DIST)
+                lrVel = -100
                 frame_count = FRAMES_TO_IGNORE
 
             elif pose_type == "Left":
-                tello.move_right(MOVE_CONSTANT_DIST)
+                lrVel = 100
                 frame_count = FRAMES_TO_IGNORE
 
             elif pose_type == "For":
-                tello.move_forward(MOVE_CONSTANT_DIST)
+                distSetpoint += 50
+
+                if distSetpoint >= MAX_DIST:
+                    distSetpoint = MAX_DIST
+
                 frame_count = FRAMES_TO_IGNORE
 
             elif pose_type == "Back":
-                tello.move_back(MOVE_CONSTANT_DIST)
+                distSetpoint -= 50
+
+                if distSetpoint <= MIN_DIST:
+                    distSetpoint = MIN_DIST
+
                 frame_count = FRAMES_TO_IGNORE
 
             elif pose_type == "Snap":
@@ -89,25 +107,37 @@ with mp.solutions.pose.Pose(
 
             elif pose_type == "Land":
                 tello.send_rc_control(0, 0, 0, 0)
-                cv2.destroyAllWindows()
+
                 sleep(2)
+
                 tello.land()
                 is_takeoff = False
+
+                cv2.destroyAllWindows()
                 break
 
         # Get the Setpoint for the Controllers
         if len(landmarks) > 0:
             nose_x, nose_y, _ = landmarks[mp.solutions.pose.PoseLandmark.NOSE.value]
+            hip_x, hip_y, _ = landmarks[mp.solutions.pose.PoseLandmark.RIGHT_HIP.value]
+            fbError = hip_y - nose_y
 
         else:
             nose_x = image_width // 2
             nose_y = image_height // 2
 
+            fbError = 200
+
+        # nose_z = nose_z * (1 - alpha) + alpha * tmp_nose_z
+
         image = cv2.circle(image, (int(nose_x), int(nose_y)),
                            15, (255, 255, 255), -1)
 
-        yaw_correction, ud_correction = track_person(tello, ud_PID, yaw_PID, (nose_x, nose_y),
-                                                     (image_width // 2, image_height // 2))
+        cv2.putText(image, str(int(fbError)), (int(nose_x), int(
+            nose_y)), font, 0.5, (255, 100, 100), 1, cv2.LINE_AA)
+
+        yaw_correction, ud_correction, fb_PID_val = track_person(tello, ud_PID, yaw_PID, (
+            nose_x, nose_y, fbError), (image_width // 2, image_height // 2, distSetpoint), lrVel, fbVel)
 
         # Get FPS
         Time = time()
@@ -126,12 +156,20 @@ with mp.solutions.pose.Pose(
                     (10, 30), font, 0.8, (255, 255, 0), 2, cv2.LINE_AA)
         cv2.putText(image, "Mode: " + pose_type, (10, 130),
                     font, 0.6, (255, 128, 0), 1, cv2.LINE_AA)
-        cv2.putText(image, "Yaw     : " + str(yaw_correction),
+        cv2.putText(image, "Distance: " + str(distSetpoint), (10, 160),
+                    font, 0.5, (255, 128, 0), 1, cv2.LINE_AA)
+
+        cv2.putText(image, "Yaw    : " + str(yaw_correction),
                     (10, 450), font, 0.5, (255, 100, 100), 1, cv2.LINE_AA)
-        cv2.putText(image, "Vertical : " + str(ud_correction),
+        cv2.putText(image, "Vertical: " + str(ud_correction),
                     (10, 420), font, 0.5, (255, 100, 100), 1, cv2.LINE_AA)
+        cv2.putText(image, "Back n Forth: " + str(fb_PID_val),
+                    (10, 390), font, 0.5, (255, 100, 100), 1, cv2.LINE_AA)
 
         cv2.imshow('Tello Stream', image)
+
+        lrVel *= 0.9
+        fbVel *= 0.9
 
         # Emergency Land Button ==> q
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -139,11 +177,13 @@ with mp.solutions.pose.Pose(
             if is_takeoff:
 
                 tello.send_rc_control(0, 0, 0, 0)
-                cv2.destroyAllWindows()
-                sleep(2)
-                tello.land()
 
+                tello.land()
                 is_takeoff = False
+
+                cv2.destroyAllWindows()
+                sleep(1)
+                break
 
             break
 

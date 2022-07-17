@@ -4,11 +4,14 @@ from time import sleep
 
 global yaw_PID, ud_PID
 
-yaw_PID = {'kp': 0.3, 'ki': 0.01, 'kd': 0.7, 'prev_err': 0,
-           'max_int': 10, 'max_output': 70, 'min_output': -70}
+yaw_PID = {'kp': 0.25, 'ki': 0.01, 'kd': 0.7, 'prev_err': 0,
+           'max_int': 10, 'max_output': 50, 'min_output': -50}
 
 ud_PID = {'kp': 0.3, 'ki': 0.01, 'kd': 0.7, 'prev_err': 0,
           'max_int': 10, 'max_output': 50, 'min_output': -50}
+
+fb_PID = {'kp': 0.3, 'ki': 0.02, 'kd': 0.7, 'prev_err': 0,
+          'max_int': 15, 'max_output': 50, 'min_output': -50}
 
 
 def drone_init():
@@ -44,7 +47,7 @@ def tello_get_frame(drone, w=640, h=480):
     return img
 
 
-def track_person(drone, ud_PID, yaw_PID, current, setpoint):
+def track_person(drone, ud_PID, yaw_PID, current, setpoint, lrVel, fbVel):
 
     # Calculate Yaw error
     err = setpoint[0] - current[0]
@@ -90,7 +93,30 @@ def track_person(drone, ud_PID, yaw_PID, current, setpoint):
         min(ud_PID_val, ud_PID['max_output']), ud_PID['min_output'])
     ud_PID_val = int(ud_PID_val)
 
-    # Update drone yaw
-    drone.send_rc_control(0, 0, ud_PID_val, yaw_PID_val)
+    # Same Procedure for the Forward and Backwards error
+    err = setpoint[2] - current[2]
+    # Proportional
+    fb_PID_val = fb_PID['kp'] * err
+    fb_PID_val += fb_PID['kd'] * \
+        (err - fb_PID['prev_err'])                 # Derivative
 
-    return yaw_PID_val, ud_PID_val
+    fb_int = fb_PID['ki'] * (err + fb_PID['prev_err'])
+
+    # Limit the fb_PID_val
+    fb_int = min(fb_PID['max_int'], max(-fb_PID['max_int'], fb_int))
+
+    # Integral
+    fb_PID_val += fb_int
+
+    # Update previous error
+    fb_PID['prev_err'] = err
+
+    # Limit PID output
+    fb_PID_val = max(
+        min(fb_PID_val, fb_PID['max_output']), fb_PID['min_output'])
+    fb_PID_val = int(fb_PID_val)
+
+    # Update drone yaw
+    drone.send_rc_control(int(lrVel), fb_PID_val, ud_PID_val, yaw_PID_val)
+
+    return yaw_PID_val, ud_PID_val, fb_PID_val
