@@ -35,8 +35,8 @@ fbVel = 0
 distSetpoint = 200
 
 
-print("Image width: " + str(image_width))
-print("Image height: " + str(image_height))
+# print("Image width: " + str(image_width))
+# print("Image height: " + str(image_height))
 
 with mp.solutions.pose.Pose(
         min_detection_confidence=0.9,
@@ -46,6 +46,7 @@ with mp.solutions.pose.Pose(
 
     while True:
 
+        # Take off and Rise
         if is_takeoff == False:
             tello.takeoff()
             tello.send_rc_control(0, 0, 50, 0)
@@ -57,12 +58,15 @@ with mp.solutions.pose.Pose(
         if frame_count > 0:
             frame_count -= 1
 
+        # Image Acquisition
         image = tello_get_frame(tello, image_width, image_height)
 
+        # Extract Landmarks of the Frame
         image, landmarks = landmark_image_prepare(
             image, pose, image_width,
             image_height,  draw_landmark=False, flip_image=True)
 
+        # Calculate Angles of the Sholders and Elbows
         angles = gimmeAngles(landmarks=landmarks, Print=False)
 
         # Classify Pose and Put text int the middle of the Image
@@ -75,7 +79,7 @@ with mp.solutions.pose.Pose(
 
             elif pose_type == "Flip":
                 tello.flip_back()
-                frame_count = FRAMES_TO_IGNOREbb
+                frame_count = FRAMES_TO_IGNORE
 
             elif pose_type == "Right":
                 lrVel = -100
@@ -122,19 +126,19 @@ with mp.solutions.pose.Pose(
             hip_x, hip_y, _ = landmarks[mp.solutions.pose.PoseLandmark.RIGHT_HIP.value]
             fbError = hip_y - nose_y
 
-        else:
+        else:  # If there is no person in the frame
             nose_x = image_width // 2
             nose_y = image_height // 2
 
             fbError = 200
 
-        # nose_z = nose_z * (1 - alpha) + alpha * tmp_nose_z
+        # Uncomment for to see the Tracking Point and Depth Error
 
-        image = cv2.circle(image, (int(nose_x), int(nose_y)),
-                           15, (255, 255, 255), -1)
+        # image = cv2.circle(image, (int(nose_x), int(nose_y)),
+        #                    15, (255, 255, 255), -1)
 
-        cv2.putText(image, str(int(fbError)), (int(nose_x), int(
-            nose_y)), font, 0.5, (255, 100, 100), 1, cv2.LINE_AA)
+        # cv2.putText(image, str(int(fbError)), (int(nose_x), int(
+        #     nose_y)), font, 0.5, (255, 100, 100), 1, cv2.LINE_AA)
 
         yaw_correction, ud_correction, fb_PID_val = track_person(tello, ud_PID, yaw_PID, (
             nose_x, nose_y, fbError), (image_width // 2, image_height // 2, distSetpoint), lrVel, fbVel)
@@ -168,6 +172,7 @@ with mp.solutions.pose.Pose(
 
         cv2.imshow('Tello Stream', image)
 
+        # Lower the Right/Left Movement Speed
         lrVel *= 0.9
         fbVel *= 0.9
 

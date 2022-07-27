@@ -4,6 +4,7 @@ from time import sleep
 
 global yaw_PID, ud_PID
 
+# PID Gains and Specs
 yaw_PID = {'kp': 0.25, 'ki': 0.01, 'kd': 0.7, 'prev_err': 0,
            'max_int': 10, 'max_output': 50, 'min_output': -50}
 

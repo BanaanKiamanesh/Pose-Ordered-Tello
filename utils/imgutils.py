@@ -128,6 +128,7 @@ def isinrange(angle, origin, threshold):
     return False
 
 
+# Pose Classification Tree
 def classifyPose(angles, threshold=15):
     '''
     Function to Detect the Pose Based on the Angles
@@ -180,9 +181,9 @@ def classifyPose(angles, threshold=15):
         else:
             return 'AT'
 
+
+
 # Function to take a SnapShot and Save it to the Directory with Specified Image Name
-
-
 def snapshot(image):
     '''
     Function to Save the Image Into the Repo Named Snapshots 
